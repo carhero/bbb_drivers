@@ -69,12 +69,13 @@ struct bbbgpio_ioctl_struct
       
 };
 
+#define BUF_LEN 8            /* Max length of the message from the device */
 struct bbb_ring_buffer
 {
-	uint8_t data;
-	uint8_t length;
-	uint8_t start;
-	uint8_t end;
+	u8 data[BUF_LEN];
+	u8 length;
+	u8 head;
+	u8 tail;
 };
 
 static struct bbbgpio_device *bbbgpiodev_Ptr=NULL;
@@ -84,8 +85,11 @@ static struct bbbgpio_ioctl_struct ioctl_buffer;
 
 static enum EBbbWorkingMode bbb_working_mode=BUSY_WAIT;
 
-#define BUF_LEN 8            /* Max length of the message from the device */
-static struct bbb_ring_buffer bbb_data_buffer[BUF_LEN];
+
+static struct bbb_ring_buffer bbb_data_buffer;
+static void bbb_buffer_push(struct bbb_ring_buffer *,u8);
+static s8 bbb_buffer_pop(struct bbb_ring_buffer *,u8 *);
+
 
 volatile int bbb_irq=-1;
 
@@ -452,6 +456,29 @@ kernel_probe_interrupt(void)
 	if(bbb_irq==-1){
 		driver_err(KERN_INFO "%s: no irq reported by probe after %d attempts\n",DEVICE_NAME,count);
 	}
+}
+
+static void 
+bbb_buffer_push(struct bbb_ring_buffer *buffer,u8 data)
+{
+	buffer->data[buffer->tail]=data;
+	buffer->tail=(buffer->tail+1)%BUF_LEN;
+	if(buffer->length<BUF_LEN){
+		buffer->length++;
+	}else{
+		buffer->head=(buffer->head+1)%BUF_LEN;
+	}
+}
+static s8 
+bbb_buffer_pop(struct bbb_ring_buffer *buffer,u8 *data)
+{
+	if(!buffer->length){
+		return -1;
+	}
+	*data=buffer->data[buffer->head];
+	buffer->head=(buffer->head+1)%BUF_LEN;
+	buffer->length--;
+	return 0;
 }
 
 static int
