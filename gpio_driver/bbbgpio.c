@@ -49,11 +49,13 @@ DRIVER's DEBUGGING MACROS
 
 #endif
 
+/*Enum with work modes available in bbbgpio.*/
 enum EBbbWorkingMode
 {
 	BUSY_WAIT=0x00,
 	INT_DRIVEN=0x01
 };
+/*bbbgpio device structure*/
 struct bbbgpio_device{
 	struct cdev cdev;
 	struct device *device_Ptr;
@@ -61,6 +63,7 @@ struct bbbgpio_device{
 	u8 is_open;
 };
 
+/*Ioctl structure. Gpio group will be 0 to 3. Value that will be read/write will be 1<<PIN_NO*/
 struct bbbgpio_ioctl_struct
 {
 	u8 gpio_group;
@@ -69,6 +72,21 @@ struct bbbgpio_ioctl_struct
       
 };
 
+
+
+static struct bbbgpio_device *bbbgpiodev_Ptr=NULL;
+static dev_t bbbgpio_dev_no;
+static struct class *bbbgpioclass_Ptr=NULL;
+static struct bbbgpio_ioctl_struct ioctl_buffer;
+volatile int bbb_irq=-1;
+static enum EBbbWorkingMode bbb_working_mode=BUSY_WAIT;/*by default, the driver will be in BUSY_WAIT mode*/
+
+
+/*
+====================================
+DRIVER's RING BUFFER API
+====================================
+*/
 #define BUF_LEN 8            /* Max length of the message from the device */
 struct bbb_ring_buffer
 {
@@ -77,29 +95,23 @@ struct bbb_ring_buffer
 	u8 head;
 	u8 tail;
 };
-
-static struct bbbgpio_device *bbbgpiodev_Ptr=NULL;
-static dev_t bbbgpio_dev_no;
-static struct class *bbbgpioclass_Ptr=NULL;
-static struct bbbgpio_ioctl_struct ioctl_buffer;
-
-static enum EBbbWorkingMode bbb_working_mode=BUSY_WAIT;
-
-
 static struct bbb_ring_buffer bbb_data_buffer;
 static void bbb_buffer_push(struct bbb_ring_buffer *,u8);
 static s8 bbb_buffer_pop(struct bbb_ring_buffer *,u8 *);
 
 
-volatile int bbb_irq=-1;
 
 
 
-static u8 msg[BUF_LEN];    /* The msg the device will give when asked    */
-static u8 *msg_Ptr;
 
+static u8 msg[BUF_LEN];    /* The msg the device will give when asked  TODO:REMOVE  */
+static u8 *msg_Ptr;/*TODO:Remove*/
 
-
+/*
+====================================
+DRIVER's IOCTL OPTIONS
+====================================
+*/
 #define _IOCTL_MAGIC 'K'
 #define BBBGPIOWR       _IOW(_IOCTL_MAGIC,1,struct bbbgpio_ioctl*)      /*write data to register*/
 #define BBBGPIORD       _IOR(_IOCTL_MAGIC,2,struct bbbgpio_ioctl*)      /*red from register*/
@@ -117,7 +129,11 @@ static u8 *msg_Ptr;
 #define BBBGPIOGIN      _IOR(_IOCTL_MAGIC,14,struct bbbgpio_ioctl*)     /*read gpio interrupt flag*/
 
 
-
+/*
+====================================
+DRIVER's SYSFS & ISR FUNCTIONS
+====================================
+*/
 static int bbbgpio_open(struct inode*,struct file*);
 static void kernel_probe_interrupt(void);
 static irq_handler_t irq_handler(int,void *,struct pt_regs *);
@@ -166,6 +182,8 @@ bbbgpio_release(struct inode *inode,struct file *file)
 	return 0;
 }
 
+/*write_buffer and read_buffer are just to generic functions to 
+read and write data when a ioctl option is passed to driver*/
 static long
 bbbgpio_write_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_register)
 {
@@ -372,13 +390,8 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	return 0;     
 }
 
-static irq_handler_t 
-irq_handler(int irq,void *dev_id,struct pt_regs *regs)
-{
-	driver_info("Interrup handler executed!\n");
-	return (irq_handler_t) IRQ_HANDLED;
-}
-static ssize_t bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
+static ssize_t 
+bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 {
 	if(bbb_working_mode==BUSY_WAIT){
 		/*read directly from gpio*/
@@ -409,7 +422,8 @@ static ssize_t bbbgpio_read(struct file *filp,char __user *buffer,size_t length,
 	return bytes_read;
 	
 }
-static ssize_t bbbgpio_write(struct file *filp, const char __user *buffer, size_t length, loff_t *offset)
+static ssize_t 
+bbbgpio_write(struct file *filp, const char __user *buffer, size_t length, loff_t *offset)
 {
 	if(bbb_working_mode==BUSY_WAIT){
 		/*write directly to gpio*/
@@ -432,6 +446,13 @@ static ssize_t bbbgpio_write(struct file *filp, const char __user *buffer, size_
 	return length-bytes_not_wrote;
 }
 
+static irq_handler_t 
+irq_handler(int irq,void *dev_id,struct pt_regs *regs)
+{
+	driver_info("Interrup handler executed!\n");
+	/*TODO: read from memory and set value to buffer bbb_buffer_push(...)*/
+	return (irq_handler_t) IRQ_HANDLED;
+}
 
 static void 
 kernel_probe_interrupt(void)
