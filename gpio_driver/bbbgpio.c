@@ -10,6 +10,7 @@
 #include <linux/device.h>
 #include <asm/barrier.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 #include "bbb_registers.h"
 
 /*
@@ -44,11 +45,15 @@ DRIVER's DEBUGGING MACROS
 #define driver_dbg(format,arg...)	
 #define driver_info(format,arg...)	
 #define driver_warn(format,arg...)	
-#define driver_err(format,arg...)	
+#define driver_err(format,arg...)	do { printk( DEBUGGING_ERROR   format, ## arg ); } while(0)
 
 #endif
 
-
+enum EBbbWorkingMode
+{
+	BUSY_WAIT=0x00,
+	INT_DRIVEN=0x01
+};
 struct bbbgpio_device{
 	struct cdev cdev;
 	struct device *device_Ptr;
@@ -64,13 +69,32 @@ struct bbbgpio_ioctl_struct
       
 };
 
+struct bbb_ring_buffer
+{
+	uint8_t data;
+	uint8_t length;
+	uint8_t start;
+	uint8_t end;
+};
+
 static struct bbbgpio_device *bbbgpiodev_Ptr=NULL;
 static dev_t bbbgpio_dev_no;
 static struct class *bbbgpioclass_Ptr=NULL;
 static struct bbbgpio_ioctl_struct ioctl_buffer;
+
+static enum EBbbWorkingMode bbb_working_mode=BUSY_WAIT;
+
 #define BUF_LEN 8            /* Max length of the message from the device */
+static struct bbb_ring_buffer bbb_data_buffer[BUF_LEN];
+
+volatile int bbb_irq=-1;
+
+
+
 static u8 msg[BUF_LEN];    /* The msg the device will give when asked    */
 static u8 *msg_Ptr;
+
+
 
 #define _IOCTL_MAGIC 'K'
 #define BBBGPIOWR       _IOW(_IOCTL_MAGIC,1,struct bbbgpio_ioctl*)      /*write data to register*/
@@ -85,13 +109,14 @@ static u8 *msg_Ptr;
 #define BBBGPIOGH1      _IOR(_IOCTL_MAGIC,10,struct bbbgpio_ioctl*)      /*get low detect*/
 #define BBBGPIOGRE      _IOR(_IOCTL_MAGIC,11,struct bbbgpio_ioctl*)      /*get low detect*/
 #define BBBGPIOGFE      _IOR(_IOCTL_MAGIC,12,struct bbbgpio_ioctl*)      /*get low detect*/
-#define BBBGPIOSIN      _IOW(_IOCTL_MAGIC,9,struct bbbgpio_ioctl*)      /*enable gpio interrupt*/
-#define BBBGPIOGIN      _IOR(_IOCTL_MAGIN,10,struct bbbgpio_ioctl*)     /*read gpio interrupt flag*/
+#define BBBGPIOSIN      _IOW(_IOCTL_MAGIC,13,struct bbbgpio_ioctl*)      /*enable gpio interrupt*/
+#define BBBGPIOGIN      _IOR(_IOCTL_MAGIC,14,struct bbbgpio_ioctl*)     /*read gpio interrupt flag*/
 
 
 
 static int bbbgpio_open(struct inode*,struct file*);
 static void kernel_probe_interrupt(void);
+static irq_handler_t irq_handler(int,void *,struct pt_regs *);
 static int bbbgpio_release(struct inode*,struct file*);
 static long bbbgpio_ioctl(struct file*, unsigned int ,unsigned long );
 static ssize_t bbbgpio_read(struct file *,char __user*,size_t,loff_t*);
@@ -226,7 +251,6 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case BBBGPIOGD:
 	{
-		
 		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_OE))!=0){
                         return error_code;
 		}
@@ -234,6 +258,9 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case BBBGPIOSL0:
 	{
+		if(bbb_working_mode==BUSY_WAIT){
+			break;
+		}
 		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_LEVELDETECT0))!=0){
                         return error_code;
 		}
@@ -241,6 +268,9 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case BBBGPIOSH1:
 	{
+		if(bbb_working_mode==BUSY_WAIT){
+			break;
+		}
 		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_LEVELDETECT1))!=0){
                         return error_code;
 		}
@@ -248,6 +278,9 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case BBBGPIOSRE:
 	{
+		if(bbb_working_mode==BUSY_WAIT){
+			break;
+		}
 		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_RISINGDETECT))!=0){
                         return error_code;
 		}
@@ -255,6 +288,9 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case BBBGPIOSFE:
 	{
+		if(bbb_working_mode==BUSY_WAIT){
+			break;
+		}
 		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_FALLINGDETECT))!=0){
                         return error_code;
 		}                  
@@ -293,8 +329,28 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	
 	case BBBGPIOSIN:
 	{
-		/*do kernel probing probing! :)*/
-		/*TODO: Use a buffer for storing data in interrupt mode. PS: use enum for working mode- interrupt base or busy-wait*/
+		if(bbb_working_mode==INT_DRIVEN){
+			break;
+		}
+		if(copy_from_user(&ioctl_buffer,p_bbbgpio_user_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
+			driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+			return -EINVAL;
+		}
+
+		kernel_probe_interrupt();
+		if(bbb_irq!=-1){
+			
+			if(request_irq(bbb_irq,(irq_handler_t) irq_handler,IRQF_DISABLED,DEVICE_NAME,NULL)){
+ 	                        driver_err("%s:can't get assigned irq %i\n",DEVICE_NAME,bbb_irq);
+ 	                        bbb_irq=-1;
+			}
+		}
+		if(bbb_irq!=-1){
+			/*If kernel probe successfully and an irq was assigned, change to INT_DRIVEN working mode*/
+			bbb_working_mode=INT_DRIVEN;
+		}
+		/*TODO: Use a buffer for storing data in interrupt mode. */
 		break;
 	}
 	case BBBGPIOGIN:
@@ -312,9 +368,20 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	return 0;     
 }
 
+static irq_handler_t 
+irq_handler(int irq,void *dev_id,struct pt_regs *regs)
+{
+	driver_info("Interrup handler executed!\n");
+	return (irq_handler_t) IRQ_HANDLED;
+}
 static ssize_t bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 {
-	
+	if(bbb_working_mode==BUSY_WAIT){
+		/*read directly from gpio*/
+	}
+	else{
+		/*read values from buffer*/
+	}
 	int bytes_read = 0;
 	
 	/* If we're at the end of the message, return 0 signifying end of file */
@@ -340,6 +407,12 @@ static ssize_t bbbgpio_read(struct file *filp,char __user *buffer,size_t length,
 }
 static ssize_t bbbgpio_write(struct file *filp, const char __user *buffer, size_t length, loff_t *offset)
 {
+	if(bbb_working_mode==BUSY_WAIT){
+		/*write directly to gpio*/
+	}
+	else{
+		/*write to a buffer*/
+	}
 	u8 bytes_not_wrote;
 	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
@@ -360,11 +433,24 @@ static void
 kernel_probe_interrupt(void)
 {
 	u8 count=0;
-	int errno=0;
-	while(errno<0 && count<5){
-		unsigned long maks;
+	unsigned long mask;
+	volatile u32 *memory_Ptr=NULL;
+	while(bbb_irq<0 && count<5){
 		mask=probe_irq_on();
-		
+		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_SET_0);/*calculate address of GPIO_IRQSTATUS_SET_0*/
+		*memory_Ptr=ioctl_buffer.write_buffer;/*Enable interrupt. Value from write buffer will be 1<<PIN_NUMBER*/
+		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_SET_1);/*calculate address of GPIO_IRQSTATUS_SET_1*/
+		*memory_Ptr=ioctl_buffer.write_buffer;/*Enable interrupt. Value from write buffer will be 1<<PIN_NUMBER*/
+		udelay(5);/*wait some time*/
+		count++;
+		if ((bbb_irq = probe_irq_off(mask)) == 0) { /* none of them? */
+ 			driver_err(KERN_INFO "%s: no irq reported by probe\n",DEVICE_NAME);
+ 			bbb_irq=-1;
+ 		}
+ 		
+	}
+	if(bbb_irq==-1){
+		driver_err(KERN_INFO "%s: no irq reported by probe after %d attempts\n",DEVICE_NAME,count);
 	}
 }
 

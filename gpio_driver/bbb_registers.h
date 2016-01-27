@@ -40,13 +40,13 @@
 static inline u32
 gpioreg_map(u8 gpio_group)
 {
-      switch(gpio_group){
-            case '0':return GPIO0;
-            case '1':return GPIO1;
-            case '2':return GPIO2;
-            case '3':return GPIO3;
-            default: return GPIO0;/*added GPIO0 for out of range address. to prevent a segfault or kernel dump, altough gpio_group will never be out of range*/
-      }
+	switch(gpio_group){
+	case '0':return GPIO0;
+	case '1':return GPIO1;
+	case '2':return GPIO2;
+	case '3':return GPIO3;
+	default: return GPIO0;/*added GPIO0 for out of range address. to prevent a segfault or kernel dump, altough gpio_group will never be out of range*/
+	}
 }
 
 
