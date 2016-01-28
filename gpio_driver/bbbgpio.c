@@ -90,22 +90,21 @@ DRIVER's RING BUFFER API
 #define BUF_LEN 8            /* Max length of the message from the device */
 struct bbb_ring_buffer
 {
-	u8 data[BUF_LEN];
+	u32 data[BUF_LEN];
 	u8 length;
 	u8 head;
 	u8 tail;
 };
 static struct bbb_ring_buffer bbb_data_buffer;
-static void bbb_buffer_push(struct bbb_ring_buffer *,u8);
-static s8 bbb_buffer_pop(struct bbb_ring_buffer *,u8 *);
+static void bbb_buffer_push(struct bbb_ring_buffer *,u32);
+static s8 bbb_buffer_pop(struct bbb_ring_buffer *,u32 *);
 static void bbb_buffer_init(struct bbb_ring_buffer *);
 
 
 
 
 
-static u8 msg[BUF_LEN];    /* The msg the device will give when asked  TODO:REMOVE  */
-static u8 *msg_Ptr;/*TODO:Remove*/
+
 
 /*
 ====================================
@@ -158,7 +157,6 @@ struct file_operations fops=
 static int 
 bbbgpio_open(struct inode *inode,struct file *file)
 {
-	msg_Ptr = msg;
 	driver_info("%s:Open\n",DEVICE_NAME);
 	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
@@ -379,8 +377,8 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case BBBGPIOGWM:
 	{
-		ioctl_buffer.read_data=bbb_working_mode;
-		if(copy_to_user(p_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+		ioctl_buffer.read_buffer=bbb_working_mode;
+		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
 			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
 			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			return -EINVAL;
@@ -414,59 +412,72 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 static ssize_t 
 bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 {
-	int bytes_read = 0;
-	if(bbb_working_mode==BUSY_WAIT){
-		/*read directly from gpio*/
-	}
-	else{
-		/*read values from buffer*/
-	}
-
 	
-	/* If we're at the end of the message, return 0 signifying end of file */
-	if (*msg_Ptr == 0) return 0;
+	u32 data;
+	volatile u32* memory_Ptr=NULL;
 	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		return -EBUSY;  
 	}
-	/* Actually put the data into the buffer */
-	while (length && *msg_Ptr)  {
-		/* The buffer is in the user data segment, not the kernel segment;
-		 * assignment won't work.  We have to use put_user which copies data from
-		 * the kernel data segment to the user data segment. */
-		put_user(*(msg_Ptr++), buffer++);
-		length--;
-		bytes_read++;
+	if(bbb_working_mode==BUSY_WAIT){
+		if(copy_from_user(&ioctl_buffer,buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+			driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+			return -EINVAL;
+		}
+		rmb();
+		if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
+			memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_DATAIN);
+			ioctl_buffer.read_buffer=*memory_Ptr;
+			if(copy_to_user(buffer,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+				driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+				mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+				return -EINVAL;
+			}
+			
+		}
+		
 	}
-	
+	else{
+		if(bbb_buffer_pop(&bbb_data_buffer,&data)!=0){
+			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+			return -EINVAL;
+		}
+		if(copy_to_user(buffer,&data,sizeof(data))!=0){
+			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+			return -EINVAL;
+		}
+		
+	}
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-	/* Most read functions return the number of bytes put into the buffer */
-	return bytes_read;
+	return 0;
 	
 }
 static ssize_t 
 bbbgpio_write(struct file *filp, const char __user *buffer, size_t length, loff_t *offset)
 {
-	u8 bytes_not_wrote;
-	if(bbb_working_mode==BUSY_WAIT){
-		/*write directly to gpio*/
-	}
-	else{
-		/*write to a buffer*/
-	}
-
+	volatile u32* memory_Ptr=NULL;
 	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		return -EBUSY;  
 	}
-	bytes_not_wrote=copy_from_user(msg,buffer,length);
-	*offset+=length-bytes_not_wrote;
-	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-	if(bytes_not_wrote){
-		driver_err("Could not write %d\n",bytes_not_wrote);
-		return -EFAULT;
+	
+	if(copy_from_user(&ioctl_buffer,buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
+		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+		return -EINVAL;
 	}
-	return length-bytes_not_wrote;
+	wmb();
+	driver_info("%s:Write at address 0x%08X value 0x%08X\n",DEVICE_NAME,ioctl_buffer.gpio_group,ioctl_buffer.write_buffer);
+	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
+		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_DATAOUT);
+		*memory_Ptr=ioctl_buffer.write_buffer;
+		
+	}
+	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+	return 0;
 }
 
 static irq_handler_t 
@@ -537,7 +548,7 @@ bbb_buffer_init(struct bbb_ring_buffer *buffer)
 	memset(buffer,0,sizeof(struct bbb_ring_buffer));
 }
 static void 
-bbb_buffer_push(struct bbb_ring_buffer *buffer,u8 data)
+bbb_buffer_push(struct bbb_ring_buffer *buffer,u32 data)
 {
 	buffer->data[buffer->tail]=data;
 	buffer->tail=(buffer->tail+1)%BUF_LEN;
@@ -548,7 +559,7 @@ bbb_buffer_push(struct bbb_ring_buffer *buffer,u8 data)
 	}
 }
 static s8 
-bbb_buffer_pop(struct bbb_ring_buffer *buffer,u8 *data)
+bbb_buffer_pop(struct bbb_ring_buffer *buffer,u32 *data)
 {
 	if(!buffer->length){
 		return -1;
