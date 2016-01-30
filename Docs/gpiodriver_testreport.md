@@ -17,16 +17,16 @@
 | **Software Version:**      |                                                      |
 |                                                                                   |
 | **Test ID** | **Test Priority** | **Test Name** | **Precondition**        | **Test Steps**            | **Expected Results**          | **Test Status** |
-|             |                   |               |                         |                           |                               |                 |
-|             |                   |               |                         |                           |                               |                 |
-|             |                   |               |                         |                           |                               |                 |
-|             |                   |               |                         |                           |                               |                 |
-|             |                   |               |                         |                           |                               |                 |
-|             |                   |               |                         |                           |                               |                 |
-|             |                   |               |                         |                           |                               |                 |
-|             |                   |               |                         |                           |                               |                 |
-|             |                   |               |                         |                           |                               |                 |
-|             |                   |               |                         |                           |                               |                 |
+|  1          |  Critical         | open          |                         |                           |                               |                 |
+|  1          |  Critical         | release       |                         |                           |                               |                 |
+|  1          |  Critical         | ioctl         |                         |                           |                               |                 |
+|  1          |  Critical         | read          |                         |                           |                               |                 |
+|  1;4        |  Critical         | write         |                         |                           |                               |                 |
+|  1          |  Critical         | irq_probe     |                         |                           |                               |                 |
+|  1          |  Critical         | irq_handler   |                         |                           |                               |                 |
+|  1;2        |  Critical         | read_buffer   |                         |                           |                               |                 |
+|  1;2        |  Critical         | write_buffer  |                         |                           |                               |                 |
+|  1          |  Critical         | irq_disable   |                         |                           |                               |                 |
 |             |                   |               |                         |                           |                               |                 |
 |             |                   |               |                         |                           |                               |                 |
 |             |                   |               |                         |                           |                               |                 |
