@@ -192,11 +192,11 @@ bbbgpio_write_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_regist
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
 	}
-	wmb();
 	driver_info("%s:Write at address 0x%08X value 0x%08X\n",DEVICE_NAME,ioctl_buffer.gpio_group,ioctl_buffer.write_buffer);
 	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|gpio_register);
 		*memory_Ptr=ioctl_buffer.write_buffer;
+		wmb();
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return 0;
 	}
@@ -214,10 +214,10 @@ bbbgpio_read_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_registe
 		return -EINVAL;
 	}
 	driver_info("%s:Read from at address 0x%08X\n",DEVICE_NAME,ioctl_buffer.gpio_group);
-	rmb();
 	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|gpio_register);
 		ioctl_buffer.read_buffer=*memory_Ptr;
+		rmb();
 		if(copy_to_user(p_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
 			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
 			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
@@ -490,10 +490,10 @@ irq_handler(int irq,void *dev_id,struct pt_regs *regs)
 		goto exit_interrupt;
 	}
 	
-	rmb();
 	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_DATAIN);
 		ioctl_buffer.read_buffer=*memory_Ptr;
+		rmb();
 		bbb_buffer_push(&bbb_data_buffer,ioctl_buffer.read_buffer);
 	}
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
@@ -508,11 +508,12 @@ static void
 irq_disable(void)
 {
 	volatile u32 *memory_Ptr=NULL;
+	memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_CLR_0);/*calculate address of GPIO_IRQSTATUS_SET_0*/
+	*memory_Ptr=ioctl_buffer.write_buffer;/*Enable interrupt. Value from write buffer will be 1<<PIN_NUMBER*/
 	wmb();
 	memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_CLR_0);/*calculate address of GPIO_IRQSTATUS_SET_0*/
 	*memory_Ptr=ioctl_buffer.write_buffer;/*Enable interrupt. Value from write buffer will be 1<<PIN_NUMBER*/
-	memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_CLR_0);/*calculate address of GPIO_IRQSTATUS_SET_0*/
-	*memory_Ptr=ioctl_buffer.write_buffer;/*Enable interrupt. Value from write buffer will be 1<<PIN_NUMBER*/
+	wmb();
 
 }
 
@@ -524,12 +525,13 @@ kernel_probe_interrupt(void)
 	unsigned long mask;
 	volatile u32 *memory_Ptr=NULL;
 	while(bbb_irq<0 && count<5){
-		wmb();
 		mask=probe_irq_on();
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_SET_0);/*calculate address of GPIO_IRQSTATUS_SET_0*/
 		*memory_Ptr=ioctl_buffer.write_buffer;/*Enable interrupt. Value from write buffer will be 1<<PIN_NUMBER*/
+		wmb();
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_SET_1);/*calculate address of GPIO_IRQSTATUS_SET_1*/
 		*memory_Ptr=ioctl_buffer.write_buffer;/*Enable interrupt. Value from write buffer will be 1<<PIN_NUMBER*/
+		wmb();
 		udelay(5);/*wait some time*/
 		count++;
 		if ((bbb_irq = probe_irq_off(mask)) == 0) { /* none of them? */
