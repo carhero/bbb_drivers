@@ -420,21 +420,10 @@ bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 		return -EBUSY;  
 	}
 	if(bbb_working_mode==BUSY_WAIT){
-		if(copy_from_user(&ioctl_buffer,buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
-			driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
-			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-			return -EINVAL;
-		}
-		rmb();
 		if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
 			memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_DATAIN);
-			ioctl_buffer.read_buffer=*memory_Ptr;
-			if(copy_to_user(buffer,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
-				driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
-				mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-				return -EINVAL;
-			}
-			
+			data=*memory_Ptr;
+			rmb();
 		}
 		
 	}
@@ -444,12 +433,13 @@ bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			return -EINVAL;
 		}
-		if(copy_to_user(buffer,&data,sizeof(data))!=0){
-			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
-			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-			return -EINVAL;
-		}
 		
+		
+	}
+	if(copy_to_user(buffer,&data,sizeof(data))!=0){
+		driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+		return -EINVAL;
 	}
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 	return 0;
@@ -469,12 +459,11 @@ bbbgpio_write(struct file *filp, const char __user *buffer, size_t length, loff_
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
 	}
-	wmb();
 	driver_info("%s:Write at address 0x%08X value 0x%08X\n",DEVICE_NAME,ioctl_buffer.gpio_group,ioctl_buffer.write_buffer);
 	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_DATAOUT);
 		*memory_Ptr=ioctl_buffer.write_buffer;
-		
+		wmb();
 	}
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 	return 0;
