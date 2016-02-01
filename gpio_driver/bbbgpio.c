@@ -112,21 +112,21 @@ DRIVER's IOCTL OPTIONS
 ====================================
 */
 #define _IOCTL_MAGIC 'K'
-#define BBBGPIOWR       _IOW(_IOCTL_MAGIC,1,struct bbbgpio_ioctl*)      /*write data to register*/
-#define BBBGPIORD       _IOR(_IOCTL_MAGIC,2,struct bbbgpio_ioctl*)      /*red from register*/
-#define BBBGPIOSD       _IOW(_IOCTL_MAGIC,3,struct bbbgpio_ioctl*)      /*set direction*/
-#define BBBGPIOGD       _IOR(_IOCTL_MAGIC,4,struct bbbgpio_ioctl*)      /*read direction*/
-#define BBBGPIOSL0      _IOW(_IOCTL_MAGIC,5,struct bbbgpio_ioctl*)      /*set low detect*/
-#define BBBGPIOSH1      _IOW(_IOCTL_MAGIC,6,struct bbbgpio_ioctl*)      /*set high detect*/
-#define BBBGPIOSRE      _IOW(_IOCTL_MAGIC,7,struct bbbgpio_ioctl*)      /*set rising edge*/
-#define BBBGPIOSFE      _IOW(_IOCTL_MAGIC,8,struct bbbgpio_ioctl*)      /*set falling edge*/
-#define BBBGPIOGL0      _IOR(_IOCTL_MAGIC,9,struct bbbgpio_ioctl*)      /*get low detect*/
-#define BBBGPIOGH1      _IOR(_IOCTL_MAGIC,10,struct bbbgpio_ioctl*)      /*get low detect*/
-#define BBBGPIOGRE      _IOR(_IOCTL_MAGIC,11,struct bbbgpio_ioctl*)      /*get low detect*/
-#define BBBGPIOGFE      _IOR(_IOCTL_MAGIC,12,struct bbbgpio_ioctl*)      /*get low detect*/
-#define BBBGPIOSIN      _IOW(_IOCTL_MAGIC,13,struct bbbgpio_ioctl*)      /*enable gpio interrupt*/
-#define BBBGPIOGWM      _IOR(_IOCTL_MAGIC,14,struct bbbgpio_ioctl*)     /*read gpio work mode*/
-#define BBBGPIOSBW      _IOW(_IOCTL_MAGIC,15,struct bbbgpio_ioctl*)      /*enable gpio busy wait mode*/ /*TODO:Not implemented*/
+#define IOCBBBGPIOWR       _IOW(_IOCTL_MAGIC,1,struct bbbgpio_ioctl*)      /*write data to register*/
+#define IOCBBBGPIORD       _IOR(_IOCTL_MAGIC,2,struct bbbgpio_ioctl*)      /*red from register*/
+#define IOCBBBGPIOSD       _IOW(_IOCTL_MAGIC,3,struct bbbgpio_ioctl*)      /*set direction*/
+#define IOCBBBGPIOGD       _IOR(_IOCTL_MAGIC,4,struct bbbgpio_ioctl*)      /*read direction*/
+#define IOCBBBGPIOSL0      _IOW(_IOCTL_MAGIC,5,struct bbbgpio_ioctl*)      /*set low detect*/
+#define IOCBBBGPIOSH1      _IOW(_IOCTL_MAGIC,6,struct bbbgpio_ioctl*)      /*set high detect*/
+#define IOCBBBGPIOSRE      _IOW(_IOCTL_MAGIC,7,struct bbbgpio_ioctl*)      /*set rising edge*/
+#define IOCBBBGPIOSFE      _IOW(_IOCTL_MAGIC,8,struct bbbgpio_ioctl*)      /*set falling edge*/
+#define IOCBBBGPIOGL0      _IOR(_IOCTL_MAGIC,9,struct bbbgpio_ioctl*)      /*get low detect*/
+#define IOCBBBGPIOGH1      _IOR(_IOCTL_MAGIC,10,struct bbbgpio_ioctl*)      /*get low detect*/
+#define IOCBBBGPIOGRE      _IOR(_IOCTL_MAGIC,11,struct bbbgpio_ioctl*)      /*get low detect*/
+#define IOCBBBGPIOGFE      _IOR(_IOCTL_MAGIC,12,struct bbbgpio_ioctl*)      /*get low detect*/
+#define IOCBBBGPIOSIN      _IOW(_IOCTL_MAGIC,13,struct bbbgpio_ioctl*)      /*enable gpio interrupt*/
+#define IOCBBBGPIOGWM      _IOR(_IOCTL_MAGIC,14,struct bbbgpio_ioctl*)     /*read gpio work mode*/
+#define IOCBBBGPIOSBW      _IOW(_IOCTL_MAGIC,15,struct bbbgpio_ioctl*)      /*enable gpio busy wait mode*/ /*TODO:Not implemented*/
 
 /*
 ====================================
@@ -248,7 +248,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	p_bbbgpio_user_ioctl=(struct bbbgpio_ioctl_struct __user*)ioctl_param;
 	switch(ioctl_num){
-	case BBBGPIOWR:
+	case IOCBBBGPIOWR:
 	{
 		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_DATAOUT))!=0){
                         return error_code;
@@ -256,28 +256,28 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
                 
 		break;
 	}
-	case BBBGPIORD:
+	case IOCBBBGPIORD:
 	{
 		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_DATAIN))!=0){
                         return error_code;
 		}
 		break;
 	}
-	case BBBGPIOSD:
+	case IOCBBBGPIOSD:
 	{
 		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_OE))!=0){
                         return error_code;
 		}
 		break;
 	}
-	case BBBGPIOGD:
+	case IOCBBBGPIOGD:
 	{
 		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_OE))!=0){
                         return error_code;
 		}
 		break;
 	}
-	case BBBGPIOSL0:
+	case IOCBBBGPIOSL0:
 	{
 		if(bbb_working_mode==BUSY_WAIT){
 			break;
@@ -287,7 +287,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		}
 		break;
 	}
-	case BBBGPIOSH1:
+	case IOCBBBGPIOSH1:
 	{
 		if(bbb_working_mode==BUSY_WAIT){
 			break;
@@ -297,7 +297,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		}
 		break;
 	}
-	case BBBGPIOSRE:
+	case IOCBBBGPIOSRE:
 	{
 		if(bbb_working_mode==BUSY_WAIT){
 			break;
@@ -307,7 +307,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		}
 		break;
 	}
-	case BBBGPIOSFE:
+	case IOCBBBGPIOSFE:
 	{
 		if(bbb_working_mode==BUSY_WAIT){
 			break;
@@ -317,7 +317,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		}                  
 		break;
 	}
-	case BBBGPIOGL0:
+	case IOCBBBGPIOGL0:
 	{
 		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_LEVELDETECT0))!=0){
                         return error_code;
@@ -325,7 +325,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		
 		break;
 	}
-	case BBBGPIOGH1:
+	case IOCBBBGPIOGH1:
 	{
 		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_LEVELDETECT1))!=0){
                         return error_code;
@@ -333,14 +333,14 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		
 		break;
 	}
-	case BBBGPIOGRE:
+	case IOCBBBGPIOGRE:
 	{
 		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_RISINGDETECT))!=0){
                         return error_code;
 		}
 		break;
 	}
-	case BBBGPIOGFE:
+	case IOCBBBGPIOGFE:
 	{
 		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_FALLINGDETECT))!=0){
                         return error_code;
@@ -348,7 +348,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		break;
 	}
 	
-	case BBBGPIOSIN:
+	case IOCBBBGPIOSIN:
 	{
 		if(bbb_working_mode==INT_DRIVEN){
 			break;
@@ -375,7 +375,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		/*TODO: Use a buffer for storing data in interrupt mode. */
 		break;
 	}
-	case BBBGPIOGWM:
+	case IOCBBBGPIOGWM:
 	{
 		ioctl_buffer.read_buffer=bbb_working_mode;
 		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
@@ -386,7 +386,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		break;
 	}
-	case  BBBGPIOSBW:
+	case  IOCBBBGPIOSBW:
 	{
 		if(copy_from_user(&ioctl_buffer,p_bbbgpio_user_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
 			driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
