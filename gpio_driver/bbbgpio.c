@@ -11,6 +11,8 @@
 #include <asm/barrier.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
+#include <asm/io.h>/*used for ioremap*/
+#include <linux/ioport.h> /* used for request_mem_region*/
 #include "bbb_registers.h"
 
 /*
@@ -21,6 +23,10 @@ DRIVER's INFO
 #define DRIVER_AUTHOR "23ars <ardeleanasm@gmail.com>"
 #define DRIVER_DESC "Gpio Driver for BBB"
 #define DEVICE_NAME "bbbgpio"
+#define GPIO0 "bbbgpio0_group"
+#define GPIO1 "bbbgpio1_group"
+#define GPIO2 "bbbgpio2_group"
+#define GPIO3 "bbbgpio3_group"
 #define DEVICE_CLASS_NAME "bbbgpio_class"
 #define DEVICE_PROCESS "bbbgpio%d"
 
@@ -79,8 +85,12 @@ static dev_t bbbgpio_dev_no;
 static struct class *bbbgpioclass_Ptr=NULL;
 static struct bbbgpio_ioctl_struct ioctl_buffer;
 volatile int bbb_irq=-1;
+volatile u32 gpio_group0_mem_address;
+volatile u32 gpio_group1_mem_address;
+volatile u32 gpio_group2_mem_address;
+volatile u32 gpio_group3_mem_address;
 static enum EBbbWorkingMode bbb_working_mode=BUSY_WAIT;/*by default, the driver will be in BUSY_WAIT mode*/
-
+static u8 bbb_is_memory_mapped;
 
 /*
 ====================================
@@ -143,7 +153,7 @@ static ssize_t bbbgpio_read(struct file *,char __user*,size_t,loff_t*);
 static ssize_t bbbgpio_write(struct file *, const char __user *, size_t, loff_t *);
 static long bbbgpio_read_buffer(struct bbbgpio_ioctl_struct __user *,u32 );
 static long bbbgpio_write_buffer(struct bbbgpio_ioctl_struct __user *,u32 );
-
+static u32 gpioreg_map(u8);
 struct file_operations fops=
 {
 	.open=bbbgpio_open,
@@ -168,6 +178,7 @@ bbbgpio_open(struct inode *inode,struct file *file)
 	}
 	bbbgpiodev_Ptr->is_open=1;
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+	driver_info("%s:Driver Open successfully!\n",DEVICE_NAME);
 	return 0;     
 }
 
@@ -181,18 +192,39 @@ bbbgpio_release(struct inode *inode,struct file *file)
 	return 0;
 }
 
+static u32
+gpioreg_map(u8 gpio_group)
+{
+	switch(gpio_group){
+	case '0':return gpio_group0_mem_address;
+	case '1':return gpio_group1_mem_address;
+	case '2':return gpio_group2_mem_address;
+	case '3':return gpio_group3_mem_address;
+	default: return GPIO0;/*added GPIO0 for out of range address. to prevent a segfault or kernel dump, altough gpio_group will never be out of range*/
+	}
+}
+
 /*write_buffer and read_buffer are just to generic functions to 
 read and write data when a ioctl option is passed to driver*/
 static long
 bbbgpio_write_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_register)
 {
-	volatile u32 *memory_Ptr=NULL;
+#ifdef DEBUGGING
 	if(copy_from_user(&ioctl_buffer,p_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
 		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
 	}
 	driver_info("%s:Write at address 0x%08X value 0x%08X\n",DEVICE_NAME,ioctl_buffer.gpio_group,ioctl_buffer.write_buffer);
+	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+	return 0;
+#else
+	volatile u32 *memory_Ptr=NULL;
+	if(copy_from_user(&ioctl_buffer,p_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
+		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
+		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+		return -EINVAL;
+	}
 	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|gpio_register);
 		*memory_Ptr=ioctl_buffer.write_buffer;
@@ -203,17 +235,27 @@ bbbgpio_write_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_regist
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 	driver_err("%s:Invalid value for gpio group number\n",DEVICE_NAME);
 	return -EBADSLT;
+#endif
 }
 static long
 bbbgpio_read_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_register)
 {
-	volatile u32 *memory_Ptr=NULL;
+#ifdef DEBUGGING
 	if(copy_from_user(&ioctl_buffer,p_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
 		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
 	}
 	driver_info("%s:Read from at address 0x%08X\n",DEVICE_NAME,ioctl_buffer.gpio_group);
+	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+	return 0;
+#else
+	volatile u32 *memory_Ptr=NULL;
+	if(copy_from_user(&ioctl_buffer,p_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
+		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
+		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+		return -EINVAL;
+	}
 	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|gpio_register);
 		ioctl_buffer.read_buffer=*memory_Ptr;
@@ -229,6 +271,7 @@ bbbgpio_read_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_registe
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 	driver_err("%s:Invalid value for gpio group number\n",DEVICE_NAME);
 	return -EBADSLT;
+#endif
 }
 static long 
 bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_param)
@@ -388,11 +431,6 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case  IOCBBBGPIOSBW:
 	{
-		if(copy_from_user(&ioctl_buffer,p_bbbgpio_user_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
-			driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
-			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-			return -EINVAL;
-		}
 		irq_disable();
 		bbb_working_mode=BUSY_WAIT;
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
@@ -496,20 +534,26 @@ exit_interrupt:{
 static void 
 irq_disable(void)
 {
+#ifdef DEBUGGING
+	driver_info("%s:Disable IRQ\n",DEVICE_NAME);
+#else
 	volatile u32 *memory_Ptr=NULL;
 	memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_CLR_0);/*calculate address of GPIO_IRQSTATUS_SET_0*/
 	*memory_Ptr=ioctl_buffer.write_buffer;/*Enable interrupt. Value from write buffer will be 1<<PIN_NUMBER*/
 	wmb();
-	memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_CLR_0);/*calculate address of GPIO_IRQSTATUS_SET_0*/
+	memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_IRQSTATUS_CLR_1);/*calculate address of GPIO_IRQSTATUS_SET_0*/
 	*memory_Ptr=ioctl_buffer.write_buffer;/*Enable interrupt. Value from write buffer will be 1<<PIN_NUMBER*/
 	wmb();
-
+#endif
 }
 
 
 static void 
 kernel_probe_interrupt(void)
 {
+#ifdef DEBUGGING
+	driver_info("%s:Enable IRQ debug!\n",DEVICE_NAME);
+#else
 	u8 count=0;
 	unsigned long mask;
 	volatile u32 *memory_Ptr=NULL;
@@ -532,6 +576,7 @@ kernel_probe_interrupt(void)
 	if(bbb_irq==-1){
 		driver_err(KERN_INFO "%s: no irq reported by probe after %d attempts\n",DEVICE_NAME,count);
 	}
+#endif
 }
 static void 
 bbb_buffer_init(struct bbb_ring_buffer *buffer)
@@ -597,8 +642,38 @@ __init bbbgpio_init(void)
 	driver_info("Driver %s loaded.Build on %s %s\n",DEVICE_NAME,__DATE__,__TIME__);
 	memset(&ioctl_buffer,0,sizeof(struct bbbgpio_ioctl_struct));
 	bbb_buffer_init(&bbb_data_buffer);
-	
+	if(request_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START),GPIO0)==NULL){
+		driver_err("%s:Could not request memory region for %s\n",DEVICE_NAME,GPIO0);
+		goto failed_map_memory;
+	}
+	if(request_mem_region(GPIO1_START,(GPIO1_END-GPIO1_START),GPIO1)==NULL){
+		release_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START));
+		driver_err("%s:Could not request memory region for %s\n",DEVICE_NAME,GPIO1);
+		goto failed_map_memory;
+	}
+	if(request_mem_region(GPIO2_START,(GPIO2_END-GPIO2_START),GPIO2)==NULL){
+		release_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START));
+		release_mem_region(GPIO1_START,(GPIO1_END-GPIO1_START));
+		driver_err("%s:Could not request memory region for %s\n",DEVICE_NAME,GPIO2);
+		goto failed_map_memory;
+	}
+	if(request_mem_region(GPIO3_START,(GPIO3_END-GPIO3_START),GPIO3)==NULL){
+		release_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START));
+		release_mem_region(GPIO1_START,(GPIO1_END-GPIO1_START));
+		release_mem_region(GPIO2_START,(GPIO2_END-GPIO2_START));
+		driver_err("%s:Could not request memory region for %s\n",DEVICE_NAME,GPIO3);
+		goto failed_map_memory;
+	}
+	bbb_is_memory_mapped=1;
+	gpio_group0_mem_address=(u32)ioremap(GPIO0_START,(GPIO0_END-GPIO0_START));
+	gpio_group1_mem_address=(u32)ioremap(GPIO1_START,(GPIO1_END-GPIO1_START));
+	gpio_group2_mem_address=(u32)ioremap(GPIO2_START,(GPIO2_END-GPIO2_START));
+	gpio_group3_mem_address=(u32)ioremap(GPIO3_START,(GPIO3_END-GPIO3_START));		
 	return 0;
+failed_map_memory:
+	{
+		bbb_is_memory_mapped=0;
+	}
 failed_device_create:
 	{
 		device_destroy(bbbgpioclass_Ptr,MKDEV(MAJOR(bbbgpio_dev_no),0));
@@ -629,6 +704,16 @@ failed_alloc:
 static void 
 __exit bbbgpio_exit(void){
         driver_info("%s:Unregister...",DEVICE_NAME);
+	if(bbb_is_memory_mapped==1){
+		bbb_is_memory_mapped=0;
+		release_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START));
+		release_mem_region(GPIO1_START,(GPIO1_END-GPIO1_START));
+		release_mem_region(GPIO2_START,(GPIO2_END-GPIO2_START));
+		release_mem_region(GPIO3_START,(GPIO3_END-GPIO3_START));
+
+	}
+
+
         if(bbbgpiodev_Ptr!=NULL){
                 device_destroy(bbbgpioclass_Ptr,MKDEV(MAJOR(bbbgpio_dev_no),0));
                 cdev_del(&(bbbgpiodev_Ptr->cdev));
@@ -640,6 +725,7 @@ __exit bbbgpio_exit(void){
                 class_destroy(bbbgpioclass_Ptr);
                 bbbgpioclass_Ptr=NULL;
         }
+
         driver_info("Driver %s unloaded.Build on %s %s\n",DEVICE_NAME,__DATE__,__TIME__);
 }
 

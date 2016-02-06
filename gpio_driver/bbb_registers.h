@@ -1,10 +1,14 @@
 #ifndef BBBREGISTERS_H_
 #define BBBREGISTERS_H_
 
-#define GPIO0                 0x44E07000
-#define GPIO1                 0x4804C000
-#define GPIO2                 0x481AC000
-#define GPIO3                 0x481AE000
+#define GPIO0_START           0x44E07000
+#define GPIO0_END             0x44E07FFF
+#define GPIO1_START           0x4804C000
+#define GPIO1_END             0x4804CFFF
+#define GPIO2_START           0x481AC000
+#define GPIO2_END             0x481ACFFF
+#define GPIO3_START           0x481AE000
+#define GPIO3_END             0x481AEFFF
 
 
 
@@ -37,17 +41,7 @@
 
 
 
-static inline u32
-gpioreg_map(u8 gpio_group)
-{
-	switch(gpio_group){
-	case '0':return GPIO0;
-	case '1':return GPIO1;
-	case '2':return GPIO2;
-	case '3':return GPIO3;
-	default: return GPIO0;/*added GPIO0 for out of range address. to prevent a segfault or kernel dump, altough gpio_group will never be out of range*/
-	}
-}
+
 
 
 
