@@ -642,38 +642,21 @@ __init bbbgpio_init(void)
 	driver_info("Driver %s loaded.Build on %s %s\n",DEVICE_NAME,__DATE__,__TIME__);
 	memset(&ioctl_buffer,0,sizeof(struct bbbgpio_ioctl_struct));
 	bbb_buffer_init(&bbb_data_buffer);
-	if(request_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START),GPIO0)==NULL){
-		driver_err("%s:Could not request memory region for %s\n",DEVICE_NAME,GPIO0);
-		goto failed_map_memory;
+
+/*Just to be sure that memory was requested by kernel*/
+	if(
+		request_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START),GPIO0)!=NULL ||
+		request_mem_region(GPIO1_START,(GPIO1_END-GPIO1_START),GPIO1)!=NULL ||
+		request_mem_region(GPIO2_START,(GPIO2_END-GPIO2_START),GPIO2)!=NULL ||
+		request_mem_region(GPIO3_START,(GPIO3_END-GPIO3_START),GPIO3)!=NULL){
+		bbb_is_memory_mapped=1;
 	}
-	if(request_mem_region(GPIO1_START,(GPIO1_END-GPIO1_START),GPIO1)==NULL){
-		release_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START));
-		driver_err("%s:Could not request memory region for %s\n",DEVICE_NAME,GPIO1);
-		goto failed_map_memory;
-	}
-	if(request_mem_region(GPIO2_START,(GPIO2_END-GPIO2_START),GPIO2)==NULL){
-		release_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START));
-		release_mem_region(GPIO1_START,(GPIO1_END-GPIO1_START));
-		driver_err("%s:Could not request memory region for %s\n",DEVICE_NAME,GPIO2);
-		goto failed_map_memory;
-	}
-	if(request_mem_region(GPIO3_START,(GPIO3_END-GPIO3_START),GPIO3)==NULL){
-		release_mem_region(GPIO0_START,(GPIO0_END-GPIO0_START));
-		release_mem_region(GPIO1_START,(GPIO1_END-GPIO1_START));
-		release_mem_region(GPIO2_START,(GPIO2_END-GPIO2_START));
-		driver_err("%s:Could not request memory region for %s\n",DEVICE_NAME,GPIO3);
-		goto failed_map_memory;
-	}
-	bbb_is_memory_mapped=1;
+
 	gpio_group0_mem_address=(u32)ioremap(GPIO0_START,(GPIO0_END-GPIO0_START));
 	gpio_group1_mem_address=(u32)ioremap(GPIO1_START,(GPIO1_END-GPIO1_START));
 	gpio_group2_mem_address=(u32)ioremap(GPIO2_START,(GPIO2_END-GPIO2_START));
 	gpio_group3_mem_address=(u32)ioremap(GPIO3_START,(GPIO3_END-GPIO3_START));		
 	return 0;
-failed_map_memory:
-	{
-		bbb_is_memory_mapped=0;
-	}
 failed_device_create:
 	{
 		device_destroy(bbbgpioclass_Ptr,MKDEV(MAJOR(bbbgpio_dev_no),0));
