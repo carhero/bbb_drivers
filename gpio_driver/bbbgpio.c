@@ -51,7 +51,7 @@ DRIVER's DEBUGGING MACROS
 #define driver_dbg(format,arg...)	
 #define driver_info(format,arg...)	
 #define driver_warn(format,arg...)	
-#define driver_err(format,arg...)	do { printk( DEBUGGING_ERROR   format, ## arg ); } while(0)
+#define driver_err(format,arg...)	do { printk( KERN_ERR   format, ## arg ); } while(0)
 
 #endif
 
@@ -196,11 +196,11 @@ static u32
 gpioreg_map(u8 gpio_group)
 {
 	switch(gpio_group){
-	case '0':return gpio_group0_mem_address;
-	case '1':return gpio_group1_mem_address;
-	case '2':return gpio_group2_mem_address;
-	case '3':return gpio_group3_mem_address;
-	default: return GPIO0;/*added GPIO0 for out of range address. to prevent a segfault or kernel dump, altough gpio_group will never be out of range*/
+	case 0:return gpio_group0_mem_address;
+	case 1:return gpio_group1_mem_address;
+	case 2:return gpio_group2_mem_address;
+	case 3:return gpio_group3_mem_address;
+	default: return gpio_group0_mem_address;/*added GPIO0 for out of range address. to prevent a segfault or kernel dump, altough gpio_group will never be out of range*/
 	}
 }
 
