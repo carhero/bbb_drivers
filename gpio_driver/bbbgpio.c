@@ -226,9 +226,9 @@ bbbgpio_write_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_regist
 		return -EINVAL;
 	}
 	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
+		wmb();
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|gpio_register);
 		*memory_Ptr=ioctl_buffer.write_buffer;
-		wmb();
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return 0;
 	}
@@ -650,12 +650,21 @@ __init bbbgpio_init(void)
 		request_mem_region(GPIO2_START,(GPIO2_END-GPIO2_START),GPIO2)!=NULL ||
 		request_mem_region(GPIO3_START,(GPIO3_END-GPIO3_START),GPIO3)!=NULL){
 		bbb_is_memory_mapped=1;
+		driver_info("%s: Memory regions are already mapped!\n",DEVICE_NAME);
 	}
 
-	gpio_group0_mem_address=(u32)ioremap(GPIO0_START,(GPIO0_END-GPIO0_START));
-	gpio_group1_mem_address=(u32)ioremap(GPIO1_START,(GPIO1_END-GPIO1_START));
-	gpio_group2_mem_address=(u32)ioremap(GPIO2_START,(GPIO2_END-GPIO2_START));
-	gpio_group3_mem_address=(u32)ioremap(GPIO3_START,(GPIO3_END-GPIO3_START));		
+	if((gpio_group0_mem_address=(u32)ioremap(GPIO0_START,(GPIO0_END-GPIO0_START)))==NULL){
+		driver_err("%s:Could not map address %0x%08X...\n",DEVICE_NAME,GPIO0_START);
+	}
+	if((gpio_group1_mem_address=(u32)ioremap(GPIO1_START,(GPIO1_END-GPIO1_START)))==NULL){
+		driver_err("%s:Could not map address %0x%08X...\n",DEVICE_NAME,GPIO1_START);
+	}
+	if((gpio_group2_mem_address=(u32)ioremap(GPIO2_START,(GPIO2_END-GPIO2_START)))==NULL){
+		driver_err("%s:Could not map address %0x%08X...\n",DEVICE_NAME,GPIO1_START);
+	}
+	if((gpio_group3_mem_address=(u32)ioremap(GPIO3_START,(GPIO3_END-GPIO3_START)))==NULL){
+		driver_err("%s:Could not map address %0x%08X...\n",DEVICE_NAME,GPIO1_START);
+	}
 	return 0;
 failed_device_create:
 	{

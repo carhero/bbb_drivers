@@ -5,6 +5,7 @@ all:
 
 install:
 	sudo insmod ./$(FILE).ko
+	cp bbbgpio_ioctl.h /usr/include/
 run:
 	dmesg
 clean:
