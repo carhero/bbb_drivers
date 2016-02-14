@@ -240,11 +240,6 @@ bbbgpio_read_buffer(u32 gpio_register)
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|gpio_register);
 		ioctl_buffer.read_buffer=*memory_Ptr;
 		rmb();
-		if(copy_to_user(p_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
-			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
-			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-			return -EINVAL;
-		}
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return 0;
 	}
@@ -289,6 +284,10 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		if((error_code=bbbgpio_read_buffer(GPIO_DATAIN))!=0){
                         return error_code;
 		}
+		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+			return -EINVAL;
+		}
 		break;
 	}
 	case IOCBBBGPIOSD:
@@ -302,6 +301,10 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	{
 		if((error_code=bbbgpio_read_buffer(GPIO_OE))!=0){
                         return error_code;
+		}
+		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+			return -EINVAL;
 		}
 		break;
 	}
@@ -350,7 +353,10 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		if((error_code=bbbgpio_read_buffer(GPIO_LEVELDETECT0))!=0){
                         return error_code;
 		}
-		
+		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+			return -EINVAL;
+		}
 		break;
 	}
 	case IOCBBBGPIOGH1:
@@ -358,7 +364,10 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		if((error_code=bbbgpio_read_buffer(GPIO_LEVELDETECT1))!=0){
                         return error_code;
 		}
-		
+		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+			return -EINVAL;
+		}
 		break;
 	}
 	case IOCBBBGPIOGRE:
@@ -366,13 +375,21 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		if((error_code=bbbgpio_read_buffer(GPIO_RISINGDETECT))!=0){
                         return error_code;
 		}
+		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+			return -EINVAL;
+		}
 		break;
 	}
 	case IOCBBBGPIOGFE:
 	{
 		if((error_code=bbbgpio_read_buffer(GPIO_FALLINGDETECT))!=0){
                         return error_code;
-		}                  
+		}     
+		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+			return -EINVAL;
+		}             
 		break;
 	}
 	
@@ -456,7 +473,7 @@ bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 		
 		
 	}
-	if(copy_to_user(buffer,&ioctl_buffer,sizeof(data))!=0){
+	if(copy_to_user(buffer,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
 		driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
