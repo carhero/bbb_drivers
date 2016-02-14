@@ -311,6 +311,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	case IOCBBBGPIOSL0:
 	{
 		if(bbb_working_mode==BUSY_WAIT){
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			break;
 		}
 		if((error_code=bbbgpio_write_buffer(GPIO_LEVELDETECT0))!=0){
@@ -321,6 +322,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	case IOCBBBGPIOSH1:
 	{
 		if(bbb_working_mode==BUSY_WAIT){
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			break;
 		}
 		if((error_code=bbbgpio_write_buffer(GPIO_LEVELDETECT1))!=0){
@@ -331,6 +333,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	case IOCBBBGPIOSRE:
 	{
 		if(bbb_working_mode==BUSY_WAIT){
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			break;
 		}
 		if((error_code=bbbgpio_write_buffer(GPIO_RISINGDETECT))!=0){
@@ -341,6 +344,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	case IOCBBBGPIOSFE:
 	{
 		if(bbb_working_mode==BUSY_WAIT){
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			break;
 		}
 		if((error_code=bbbgpio_write_buffer(GPIO_FALLINGDETECT))!=0){
@@ -396,6 +400,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	case IOCBBBGPIOSIN:
 	{
 		if(bbb_working_mode==INT_DRIVEN){
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			break;
 		}
 		kernel_probe_interrupt();
