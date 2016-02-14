@@ -109,7 +109,7 @@ static struct bbb_ring_buffer bbb_data_buffer;
 static void bbb_buffer_push(struct bbb_ring_buffer *,u32);
 static s8 bbb_buffer_pop(struct bbb_ring_buffer *,u32 *);
 static void bbb_buffer_init(struct bbb_ring_buffer *);
-
+static u8 bbb_buffer_empty(struct bbb_ring_buffer *);
 
 
 
@@ -123,7 +123,7 @@ DRIVER's IOCTL OPTIONS
 */
 #define _IOCTL_MAGIC 'K'
 #define IOCBBBGPIOWR       _IOW(_IOCTL_MAGIC,1,struct bbbgpio_ioctl*)      /*write data to register*/
-#define IOCBBBGPIORD       _IOR(_IOCTL_MAGIC,2,struct bbbgpio_ioctl*)      /*red from register*/
+#define IOCBBBGPIORD       _IOR(_IOCTL_MAGIC,2,struct bbbgpio_ioctl*)      /*read from register*/
 #define IOCBBBGPIOSD       _IOW(_IOCTL_MAGIC,3,struct bbbgpio_ioctl*)      /*set direction*/
 #define IOCBBBGPIOGD       _IOR(_IOCTL_MAGIC,4,struct bbbgpio_ioctl*)      /*read direction*/
 #define IOCBBBGPIOSL0      _IOW(_IOCTL_MAGIC,5,struct bbbgpio_ioctl*)      /*set low detect*/
@@ -151,8 +151,8 @@ static int bbbgpio_release(struct inode*,struct file*);
 static long bbbgpio_ioctl(struct file*, unsigned int ,unsigned long );
 static ssize_t bbbgpio_read(struct file *,char __user*,size_t,loff_t*);
 static ssize_t bbbgpio_write(struct file *, const char __user *, size_t, loff_t *);
-static long bbbgpio_read_buffer(struct bbbgpio_ioctl_struct __user *,u32 );
-static long bbbgpio_write_buffer(struct bbbgpio_ioctl_struct __user *,u32 );
+static long bbbgpio_read_buffer(u32 );
+static long bbbgpio_write_buffer(u32 );
 static u32 gpioreg_map(u8);
 struct file_operations fops=
 {
@@ -207,28 +207,18 @@ gpioreg_map(u8 gpio_group)
 /*write_buffer and read_buffer are just to generic functions to 
 read and write data when a ioctl option is passed to driver*/
 static long
-bbbgpio_write_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_register)
+bbbgpio_write_buffer(u32 gpio_register)
 {
 #ifdef DEBUGGING
-	if(copy_from_user(&ioctl_buffer,p_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
-		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
-		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-		return -EINVAL;
-	}
 	driver_info("%s:Write at address 0x%08X value 0x%08X\n",DEVICE_NAME,ioctl_buffer.gpio_group,ioctl_buffer.write_buffer);
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 	return 0;
 #else
 	volatile u32 *memory_Ptr=NULL;
-	if(copy_from_user(&ioctl_buffer,p_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
-		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
-		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-		return -EINVAL;
-	}
 	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
-		wmb();
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|gpio_register);
 		*memory_Ptr=ioctl_buffer.write_buffer;
+		wmb();
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return 0;
 	}
@@ -238,24 +228,14 @@ bbbgpio_write_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_regist
 #endif
 }
 static long
-bbbgpio_read_buffer(struct bbbgpio_ioctl_struct __user *p_ioctl,u32 gpio_register)
+bbbgpio_read_buffer(u32 gpio_register)
 {
 #ifdef DEBUGGING
-	if(copy_from_user(&ioctl_buffer,p_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
-		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
-		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-		return -EINVAL;
-	}
 	driver_info("%s:Read from at address 0x%08X\n",DEVICE_NAME,ioctl_buffer.gpio_group);
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 	return 0;
 #else
 	volatile u32 *memory_Ptr=NULL;
-	if(copy_from_user(&ioctl_buffer,p_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
-		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
-		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-		return -EINVAL;
-	}
 	if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
 		memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|gpio_register);
 		ioctl_buffer.read_buffer=*memory_Ptr;
@@ -290,10 +270,15 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		return -EBUSY;
 	}
 	p_bbbgpio_user_ioctl=(struct bbbgpio_ioctl_struct __user*)ioctl_param;
+	if(copy_from_user(&ioctl_buffer,p_bbbgpio_user_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
+		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
+		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+		return -EINVAL;
+	}
 	switch(ioctl_num){
 	case IOCBBBGPIOWR:
 	{
-		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_DATAOUT))!=0){
+		if((error_code=bbbgpio_write_buffer(GPIO_DATAOUT))!=0){
                         return error_code;
 		}
                 
@@ -301,21 +286,21 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case IOCBBBGPIORD:
 	{
-		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_DATAIN))!=0){
+		if((error_code=bbbgpio_read_buffer(GPIO_DATAIN))!=0){
                         return error_code;
 		}
 		break;
 	}
 	case IOCBBBGPIOSD:
 	{
-		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_OE))!=0){
+		if((error_code=bbbgpio_write_buffer(GPIO_OE))!=0){
                         return error_code;
 		}
 		break;
 	}
 	case IOCBBBGPIOGD:
 	{
-		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_OE))!=0){
+		if((error_code=bbbgpio_read_buffer(GPIO_OE))!=0){
                         return error_code;
 		}
 		break;
@@ -325,7 +310,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		if(bbb_working_mode==BUSY_WAIT){
 			break;
 		}
-		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_LEVELDETECT0))!=0){
+		if((error_code=bbbgpio_write_buffer(GPIO_LEVELDETECT0))!=0){
                         return error_code;
 		}
 		break;
@@ -335,7 +320,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		if(bbb_working_mode==BUSY_WAIT){
 			break;
 		}
-		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_LEVELDETECT1))!=0){
+		if((error_code=bbbgpio_write_buffer(GPIO_LEVELDETECT1))!=0){
                         return error_code;
 		}
 		break;
@@ -345,7 +330,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		if(bbb_working_mode==BUSY_WAIT){
 			break;
 		}
-		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_RISINGDETECT))!=0){
+		if((error_code=bbbgpio_write_buffer(GPIO_RISINGDETECT))!=0){
                         return error_code;
 		}
 		break;
@@ -355,14 +340,14 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 		if(bbb_working_mode==BUSY_WAIT){
 			break;
 		}
-		if((error_code=bbbgpio_write_buffer(p_bbbgpio_user_ioctl,GPIO_FALLINGDETECT))!=0){
+		if((error_code=bbbgpio_write_buffer(GPIO_FALLINGDETECT))!=0){
                         return error_code;
 		}                  
 		break;
 	}
 	case IOCBBBGPIOGL0:
 	{
-		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_LEVELDETECT0))!=0){
+		if((error_code=bbbgpio_read_buffer(GPIO_LEVELDETECT0))!=0){
                         return error_code;
 		}
 		
@@ -370,7 +355,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case IOCBBBGPIOGH1:
 	{
-		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_LEVELDETECT1))!=0){
+		if((error_code=bbbgpio_read_buffer(GPIO_LEVELDETECT1))!=0){
                         return error_code;
 		}
 		
@@ -378,14 +363,14 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case IOCBBBGPIOGRE:
 	{
-		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_RISINGDETECT))!=0){
+		if((error_code=bbbgpio_read_buffer(GPIO_RISINGDETECT))!=0){
                         return error_code;
 		}
 		break;
 	}
 	case IOCBBBGPIOGFE:
 	{
-		if((error_code=bbbgpio_read_buffer(p_bbbgpio_user_ioctl,GPIO_FALLINGDETECT))!=0){
+		if((error_code=bbbgpio_read_buffer(GPIO_FALLINGDETECT))!=0){
                         return error_code;
 		}                  
 		break;
@@ -395,11 +380,6 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	{
 		if(bbb_working_mode==INT_DRIVEN){
 			break;
-		}
-		if(copy_from_user(&ioctl_buffer,p_bbbgpio_user_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
-			driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
-			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-			return -EINVAL;
 		}
 		kernel_probe_interrupt();
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);/*Unlock mutex after probing*/
@@ -414,8 +394,6 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 			/*If kernel probe successfully and an irq was assigned, change to INT_DRIVEN working mode*/
 			bbb_working_mode=INT_DRIVEN;
 		}
-
-		/*TODO: Use a buffer for storing data in interrupt mode. */
 		break;
 	}
 	case IOCBBBGPIOGWM:
@@ -451,30 +429,34 @@ static ssize_t
 bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 {
 	
-	u32 data;
 	volatile u32* memory_Ptr=NULL;
 	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		return -EBUSY;  
 	}
 	if(bbb_working_mode==BUSY_WAIT){
+		if(copy_from_user(&ioctl_buffer,buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+			driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
+			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
+			return -EINVAL;
+		}
 		if(ioctl_buffer.gpio_group>=0 && ioctl_buffer.gpio_group<=3){
 			memory_Ptr=(u32*)(gpioreg_map(ioctl_buffer.gpio_group)|GPIO_DATAIN);
-			data=*memory_Ptr;
+			ioctl_buffer.read_buffer=*memory_Ptr;
 			rmb();
 		}
 		
 	}
 	else{
-		if(bbb_buffer_pop(&bbb_data_buffer,&data)!=0){
-			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
+		if(bbb_buffer_pop(&bbb_data_buffer,&ioctl_buffer.read_buffer)!=0){
+			driver_err("\t%s:No data storred!\n",DEVICE_NAME);
 			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-			return -EINVAL;
+			return length;
 		}
 		
 		
 	}
-	if(copy_to_user(buffer,&data,sizeof(data))!=0){
+	if(copy_to_user(buffer,&ioctl_buffer,sizeof(data))!=0){
 		driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
@@ -511,7 +493,6 @@ static irq_handler_t
 irq_handler(int irq,void *dev_id,struct pt_regs *regs)
 {
 	volatile u32 *memory_Ptr=NULL;
-	/*TODO: read from memory and set value to buffer bbb_buffer_push(...)*/
 	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		goto exit_interrupt;
@@ -605,7 +586,14 @@ bbb_buffer_pop(struct bbb_ring_buffer *buffer,u32 *data)
 	buffer->length--;
 	return 0;
 }
-
+static u8
+bbb_buffer_empty(struct bbb_ring_buffer *buffer)
+{
+	if(!buffer->length){
+		return 0;
+	}
+	return 1;
+}
 static int
 __init bbbgpio_init(void)
 {
@@ -660,10 +648,10 @@ __init bbbgpio_init(void)
 		driver_err("%s:Could not map address %0x%08X...\n",DEVICE_NAME,GPIO1_START);
 	}
 	if((gpio_group2_mem_address=(u32)ioremap(GPIO2_START,(GPIO2_END-GPIO2_START)))==NULL){
-		driver_err("%s:Could not map address %0x%08X...\n",DEVICE_NAME,GPIO1_START);
+		driver_err("%s:Could not map address %0x%08X...\n",DEVICE_NAME,GPIO2_START);
 	}
 	if((gpio_group3_mem_address=(u32)ioremap(GPIO3_START,(GPIO3_END-GPIO3_START)))==NULL){
-		driver_err("%s:Could not map address %0x%08X...\n",DEVICE_NAME,GPIO1_START);
+		driver_err("%s:Could not map address %0x%08X...\n",DEVICE_NAME,GPIO2_START);
 	}
 	return 0;
 failed_device_create:
