@@ -2,10 +2,10 @@
 
 ## BBB Gpio Driver
 
-| General Test Report for **gpio_driver**-version    |                        |              |                 |
+| General Test Report for **gpio_driver**-0.1        |                        |              |                 |
 | ------------------------- | ---------------------- | ---------------------- | ----------------------------- |
 | **No of tests performed** | **No of failed tests** | **No of passed tests** | **No of not performed tests** |
-|                           |                        |                        |                               |
+|          10               |        0               |        9               |            1                  |
 
 
 ---
@@ -15,8 +15,8 @@ For all test, use DEBUG macro defined. In the testing version all debug messages
 
 | gpio_driver Test Report    |                |               |                     |                   |                               |                 |
 |----------------------------|----------------|---------------|---------------------| ----------------- | ----------------------------- | --------------- |
-| **Tester:**                | tester_name                                          |
-| **Software Version:**      |                                                      |
+| **Tester:**                | 23ars                                                |
+| **Software Version:**      | 0.1                                                  |
 |                                                                                   |
 | **Test ID** | **Test Priority** | **Test Name** | **Precondition**                             | **Test Steps**            | **Expected Results**          | **Test Status** |
 |  1          |  Critical         | init          | DEBUGGING is defined;                        | Modprobe driver;Execute `ls /dev/ | grep "bbbgpio*"` | In console message:"Driver bbbgpio loaded.Build on Mar  1 2015 21:22:38" should be displayed. Under /dev/ bbbgpio0 should be created | PASS                |
@@ -28,8 +28,8 @@ For all test, use DEBUG macro defined. In the testing version all debug messages
 |  1;4        |  Critical         | write         | DEBUGGING is defined;                        | Write a value to pin using write sysfs | No errors shall be displayed | PASS                 |
 |  1          |  Critical         | irq_probe     | DEBUGGING is defined;                        | Enable IRQ                | Probe is successfully         | PASS            |
 |  1          |  Critical         | irq_disable   | DEBUGGING is defined;                        | Use ioctl IOCBBBGPIOSBW   | In console, message:"Disable IRQ" shall be displayed | PASS    |
+|  1          |  Critical         | irq_handler   | DEBUGGING is undefined;                      | Check if handler is called| When interrupt is launched, handler shall be called  | NOT TESTED|
 |             |                   |               |                                              |                           |                               |                 |
-
 
 
 ---
