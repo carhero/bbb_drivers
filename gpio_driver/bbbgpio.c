@@ -70,12 +70,17 @@ struct bbbgpio_ioctl_struct
 	int irq_number; 
 };
 
-
+enum bbbgpio_direction
+{
+	INPUT=0x00,
+	OUTPUT
+};
 
 static struct bbbgpio_device *bbbgpiodev_Ptr=NULL;
 static dev_t bbbgpio_dev_no;
 static struct class *bbbgpioclass_Ptr=NULL;
 static struct bbbgpio_ioctl_struct ioctl_buffer;
+unsigned long irq_flags=IRQF_TRIGGER_NONE;
 volatile int bbb_irq=-1;
 
 
@@ -183,7 +188,6 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 
 	struct bbbgpio_ioctl_struct __user *p_bbbgpio_user_ioctl;
 	long error_code;
-	unsigned long irq_flags=IRQF_TRIGGER_NONE;
 	struct bbb_data_content data;
 	driver_info("%s:Ioctl\n",DEVICE_NAME);
 	memset(&data,0,sizeof(struct bbb_data_content));
@@ -226,7 +230,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	{
 		if(bbb_buffer_empty(&bbb_data_buffer)==1){
 			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-			return -EINVAL;
+			return -EAGAIN;
 		}
 		bbb_buffer_pop(&bbb_data_buffer,&data);
 		ioctl_buffer.gpio_number=data.dev_id;
@@ -241,7 +245,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case IOCBBBGPIOSD:
 	{
-		if(ioctl_buffer.write_buffer==1){
+		if(ioctl_buffer.write_buffer==OUTPUT){
 			/*set direction output with default value 0*/
 			error_code=gpio_direction_output(ioctl_buffer.gpio_number,0);
 		}else
