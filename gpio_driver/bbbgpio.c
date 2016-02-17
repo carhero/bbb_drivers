@@ -13,9 +13,9 @@
 #include <linux/gpio.h>
 
 /*
-====================================
-DRIVER's INFO
-====================================
+  ====================================
+  DRIVER's INFO
+  ====================================
 */
 #define DRIVER_AUTHOR "23ars <ardeleanasm@gmail.com>"
 #define DRIVER_DESC "Gpio Driver for BBB"
@@ -28,9 +28,9 @@ DRIVER's INFO
 #define DEVICE_PROCESS "bbbgpio%d"
 
 /*
-====================================
-DRIVER's DEBUGGING MACROS
-====================================
+  ====================================
+  DRIVER's DEBUGGING MACROS
+  ====================================
 */
 #define DEBUGGING 1
 #ifdef DEBUGGING
@@ -86,9 +86,9 @@ volatile int bbb_irq=-1;
 
 
 /*
-====================================
-DRIVER's RING BUFFER API
-====================================
+  ====================================
+  DRIVER's RING BUFFER API
+  ====================================
 */
 #define BUF_LEN 8            /* Max length of the message from the device */
 struct bbb_data_content
@@ -116,9 +116,9 @@ static u8 bbb_buffer_empty(struct bbb_ring_buffer *);
 
 
 /*
-====================================
-DRIVER's IOCTL OPTIONS
-====================================
+  ====================================
+  DRIVER's IOCTL OPTIONS
+  ====================================
 */
 #define _IOCTL_MAGIC 'K'
 #define IOCBBBGPIORP       _IOW(_IOCTL_MAGIC,1,struct bbbgpio_ioctl*)     /*IOCTL used for registering PIN*/
@@ -134,9 +134,9 @@ DRIVER's IOCTL OPTIONS
 #define IOCBBBGPIOSBW      _IOW(_IOCTL_MAGIC,11,struct bbbgpio_ioctl*)      /*enable gpio busy wait mode*/ 
 
 /*
-====================================
-DRIVER's SYSFS FUNCTIONS & ISR 
-====================================
+  ====================================
+  DRIVER's SYSFS FUNCTIONS & ISR 
+  ====================================
 */
 static int bbbgpio_open(struct inode*,struct file*);
 static int bbbgpio_release(struct inode*,struct file*);
@@ -158,11 +158,11 @@ static int
 bbbgpio_open(struct inode *inode,struct file *file)
 {
 	driver_info("%s:Open\n",DEVICE_NAME);
-	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
+	if (mutex_trylock(&bbbgpiodev_Ptr->io_mutex) == 0) {
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		return -EBUSY;
 	}
-	if(bbbgpiodev_Ptr->is_open==1){
+	if (bbbgpiodev_Ptr->is_open == 1) {
 		driver_err("%s:already open\n",DEVICE_NAME);
 		return -EBUSY;
 	}
@@ -185,28 +185,28 @@ bbbgpio_release(struct inode *inode,struct file *file)
 static long 
 bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_param)
 {
-
+	
 	struct bbbgpio_ioctl_struct __user *p_bbbgpio_user_ioctl;
 	long error_code;
 	struct bbb_data_content data;
 	driver_info("%s:Ioctl\n",DEVICE_NAME);
 	memset(&data,0,sizeof(struct bbb_data_content));
 	memset(&ioctl_buffer,0,sizeof(struct bbbgpio_ioctl_struct));
-	if(bbbgpiodev_Ptr==NULL){
+	if (bbbgpiodev_Ptr == NULL) {
 		driver_err("%s:Device not found!\n",DEVICE_NAME);
 		return -ENODEV;
 	}
-	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
+	if (mutex_trylock(&bbbgpiodev_Ptr->io_mutex) == 0) {
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		return -EBUSY;
 	}
 	p_bbbgpio_user_ioctl=(struct bbbgpio_ioctl_struct __user*)ioctl_param;
-	if(copy_from_user(&ioctl_buffer,p_bbbgpio_user_ioctl,sizeof(struct bbbgpio_ioctl_struct))!=0){
+	if (copy_from_user(&ioctl_buffer,p_bbbgpio_user_ioctl,sizeof(struct bbbgpio_ioctl_struct)) != 0) {
 		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
 	}
-	switch(ioctl_num){
+	switch (ioctl_num) {
 	case IOCBBBGPIORP:
 	{
 		gpio_request(ioctl_buffer.gpio_number,"sysfs");
@@ -228,14 +228,14 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case IOCBBBGPIORD:
 	{
-		if(bbb_buffer_empty(&bbb_data_buffer)==1){
+		if (bbb_buffer_empty(&bbb_data_buffer) == 1) {
 			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			return -EAGAIN;
 		}
 		bbb_buffer_pop(&bbb_data_buffer,&data);
 		ioctl_buffer.gpio_number=data.dev_id;
 		ioctl_buffer.read_buffer=data.data;
-		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+		if (copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct)) != 0) {
 			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
 			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			return -EINVAL;
@@ -245,18 +245,14 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case IOCBBBGPIOSD:
 	{
-		if(ioctl_buffer.write_buffer==OUTPUT){
-			/*set direction output with default value 0*/
+		if (ioctl_buffer.write_buffer == OUTPUT)
 			error_code=gpio_direction_output(ioctl_buffer.gpio_number,0);
-		}else
-		{
-			/*set direction input*/
+		else 
 			error_code=gpio_direction_input(ioctl_buffer.gpio_number);
-		}
+		
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
-		if(error_code!=0){
+		if (error_code != 0) 
 			return error_code;
-		}
 		gpio_export(ioctl_buffer.gpio_number,false);
 		break;
 	}
@@ -288,12 +284,12 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	case IOCBBBGPIOSIN:
 	{
 		bbb_irq=gpio_to_irq(ioctl_buffer.gpio_number);
-		if(request_irq(bbb_irq,(irq_handler_t) irq_handler,irq_flags,DEVICE_NAME,(void *)ioctl_buffer.gpio_number)){
+		if (request_irq(bbb_irq,(irq_handler_t) irq_handler,irq_flags,DEVICE_NAME,(void *)ioctl_buffer.gpio_number)) {
 			driver_err("%s:can't get assigned irq %i\n",DEVICE_NAME,bbb_irq);
 			bbb_irq=-1;
 		}
 		ioctl_buffer.irq_number=bbb_irq;
-		if(copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+		if (copy_to_user(p_bbbgpio_user_ioctl,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct)) != 0) {
 			driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
 			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			return -EINVAL;
@@ -323,18 +319,18 @@ static ssize_t
 bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 {
 
-	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
+	if (mutex_trylock(&bbbgpiodev_Ptr->io_mutex) == 0) {
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		return -EBUSY;  
 	}
-	if(copy_from_user(&ioctl_buffer,buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+	if (copy_from_user(&ioctl_buffer,buffer,sizeof(struct bbbgpio_ioctl_struct)) != 0) {
 		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
 	}
-		
+	
 	ioctl_buffer.read_buffer=gpio_get_value(ioctl_buffer.gpio_number);
-	if(copy_to_user(buffer,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+	if (copy_to_user(buffer,&ioctl_buffer,sizeof(struct bbbgpio_ioctl_struct)) !=0 ) {
 		driver_err("\t%s:Cout not write values to user!\n",DEVICE_NAME);
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
@@ -346,12 +342,12 @@ bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 static ssize_t 
 bbbgpio_write(struct file *filp, const char __user *buffer, size_t length, loff_t *offset)
 {
-	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
+	if (mutex_trylock(&bbbgpiodev_Ptr->io_mutex) == 0) {
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		return -EBUSY;  
 	}
 	
-	if(copy_from_user(&ioctl_buffer,buffer,sizeof(struct bbbgpio_ioctl_struct))!=0){
+	if (copy_from_user(&ioctl_buffer,buffer,sizeof(struct bbbgpio_ioctl_struct)) != 0) {
 		driver_err("%s:Could not copy data from userspace!\n",DEVICE_NAME);
 		mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 		return -EINVAL;
@@ -366,7 +362,7 @@ irq_handler(int irq,void *dev_id,struct pt_regs *regs)
 {
 	u16 io_number=(u16)dev_id;
 	struct bbb_data_content content;
-	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
+	if (mutex_trylock(&bbbgpiodev_Ptr->io_mutex) == 0) {
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		goto exit_interrupt;
 	}
@@ -378,8 +374,8 @@ irq_handler(int irq,void *dev_id,struct pt_regs *regs)
 	mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 	driver_info("Interrup handler executed!\n");
 exit_interrupt:{
-
-	return (irq_handler_t) IRQ_HANDLED;
+		
+		return (irq_handler_t) IRQ_HANDLED;
 	}
 }
 
@@ -393,18 +389,16 @@ bbb_buffer_push(struct bbb_ring_buffer *buffer,struct bbb_data_content data)
 {
 	buffer->data[buffer->tail]=data;
 	buffer->tail=(buffer->tail+1)%BUF_LEN;
-	if(buffer->length<BUF_LEN){
+	if (buffer->length < BUF_LEN) 
 		buffer->length++;
-	}else{
+	else 
 		buffer->head=(buffer->head+1)%BUF_LEN;
-	}
 }
 static s8 
 bbb_buffer_pop(struct bbb_ring_buffer *buffer,struct bbb_data_content *data)
 {
-	if(!buffer->length){
+	if (!buffer->length) 
 		return -1;
-	}
 	*data=buffer->data[buffer->head];
 	buffer->head=(buffer->head+1)%BUF_LEN;
 	buffer->length--;
@@ -413,37 +407,34 @@ bbb_buffer_pop(struct bbb_ring_buffer *buffer,struct bbb_data_content *data)
 static u8
 bbb_buffer_empty(struct bbb_ring_buffer *buffer)
 {
-	if(!buffer->length){
-		return 0;
-	}
-	return 1;
+	return (buffer->length == 0);
 }
 static int
 __init bbbgpio_init(void)
 {
 	bbbgpiodev_Ptr=kmalloc(sizeof(struct bbbgpio_device),GFP_KERNEL);
-	if(bbbgpiodev_Ptr==NULL){
+	if (bbbgpiodev_Ptr == NULL) {
 		driver_err("%s:Failed to alloc memory for p_bbbgpio_device\n",DEVICE_NAME);
 		goto failed_alloc;
 	}
 	memset(bbbgpiodev_Ptr, 0,sizeof(struct bbbgpio_device));
-	if(alloc_chrdev_region(&bbbgpio_dev_no,0,1,DEVICE_NAME)<0){
+	if (alloc_chrdev_region(&bbbgpio_dev_no,0,1,DEVICE_NAME) < 0) {
 		driver_err("%s:Coud not register\n",DEVICE_NAME);
 		goto failed_register;
 	}
 	bbbgpioclass_Ptr=class_create(THIS_MODULE,DEVICE_CLASS_NAME);
-	if(IS_ERR(bbbgpioclass_Ptr)){
+	if (IS_ERR(bbbgpioclass_Ptr)) {
 		driver_err("%s:Could not create class\n",DEVICE_NAME);
 		goto failed_class_create;
 	}
 	cdev_init(&(bbbgpiodev_Ptr->cdev),&fops);
 	bbbgpiodev_Ptr->cdev.owner=THIS_MODULE;
-	if(cdev_add(&(bbbgpiodev_Ptr->cdev),bbbgpio_dev_no,1)!=0){
+	if (cdev_add(&(bbbgpiodev_Ptr->cdev),bbbgpio_dev_no,1) != 0) {
 		driver_err("%s:Could not add device\n",DEVICE_NAME);
 		goto failed_add_device;
 	}
 	bbbgpiodev_Ptr->device_Ptr=device_create(bbbgpioclass_Ptr,NULL,MKDEV(MAJOR(bbbgpio_dev_no),0),NULL,DEVICE_PROCESS,0);
-	if(IS_ERR(bbbgpiodev_Ptr->device_Ptr)){
+	if (IS_ERR(bbbgpiodev_Ptr->device_Ptr)){
 		driver_err("%s:Could not create device\n",DEVICE_NAME);
 		goto failed_device_create;
 	}
@@ -463,7 +454,7 @@ failed_device_create:
 failed_add_device:
 	{
 		class_destroy(bbbgpioclass_Ptr);
-            bbbgpioclass_Ptr=NULL;
+		bbbgpioclass_Ptr=NULL;
 	}
 failed_class_create:
 	{
@@ -485,14 +476,14 @@ failed_alloc:
 static void 
 __exit bbbgpio_exit(void){
         driver_info("%s:Unregister...",DEVICE_NAME);
-        if(bbbgpiodev_Ptr!=NULL){
+        if (bbbgpiodev_Ptr != NULL) {
                 device_destroy(bbbgpioclass_Ptr,MKDEV(MAJOR(bbbgpio_dev_no),0));
                 cdev_del(&(bbbgpiodev_Ptr->cdev));
                 kfree(bbbgpiodev_Ptr);
                 bbbgpiodev_Ptr=NULL;
         }
         unregister_chrdev_region(bbbgpio_dev_no,1);
-        if(bbbgpioclass_Ptr!=NULL){
+        if (bbbgpioclass_Ptr != NULL) {
                 class_destroy(bbbgpioclass_Ptr);
                 bbbgpioclass_Ptr=NULL;
         }
