@@ -185,7 +185,9 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	struct bbbgpio_ioctl_struct __user *p_bbbgpio_user_ioctl;
 	long error_code;
 	unsigned long irq_flags=IRQF_TRIGGER_NONE;
+	struct bbb_data_content data;
 	driver_info("%s:Ioctl\n",DEVICE_NAME);
+	memset(&data,0,sizeof(struct bbb_data_content));
 	memset(&ioctl_buffer,0,sizeof(struct bbbgpio_ioctl_struct));
 	if(bbbgpiodev_Ptr==NULL){
 		driver_err("%s:Device not found!\n",DEVICE_NAME);
@@ -223,7 +225,6 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 	}
 	case IOCBBBGPIORD:
 	{
-		struct bbb_data_content data;
 		if(bbb_buffer_empty(&bbb_data_buffer)==1){
 			mutex_unlock(&bbbgpiodev_Ptr->io_mutex);
 			return -EINVAL;
@@ -318,7 +319,7 @@ bbbgpio_ioctl(struct file *file, unsigned int ioctl_num ,unsigned long ioctl_par
 static ssize_t 
 bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 {
-	
+
 	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		return -EBUSY;  
@@ -342,7 +343,6 @@ bbbgpio_read(struct file *filp,char __user *buffer,size_t length,loff_t *offset)
 static ssize_t 
 bbbgpio_write(struct file *filp, const char __user *buffer, size_t length, loff_t *offset)
 {
-	volatile u32* memory_Ptr=NULL;
 	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
 		driver_err("%s:Mutex not free!\n",DEVICE_NAME);
 		return -EBUSY;  
@@ -361,7 +361,6 @@ bbbgpio_write(struct file *filp, const char __user *buffer, size_t length, loff_
 static irq_handler_t 
 irq_handler(int irq,void *dev_id,struct pt_regs *regs)
 {
-	volatile u32 *memory_Ptr=NULL;
 	u16 io_number=(u16)dev_id;
 	struct bbb_data_content content;
 	if(mutex_trylock(&bbbgpiodev_Ptr->io_mutex)==0){
