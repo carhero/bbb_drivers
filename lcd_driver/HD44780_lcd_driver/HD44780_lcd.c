@@ -8,7 +8,7 @@
 
 #define AUTHOR "23ars <ardeleanasm@gmail.com>"
 #define DRIVER_DESC "LCD Driver"
-#define DEVICE_NAME "hd44780_lcd_driver"
+#define DEVICE_NAME "hd44780_lcd"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR(AUTHOR);
@@ -26,6 +26,9 @@ EXPORT_SYMBOL(hd44780_uninit_interface);
 
 extern void hd44780_execute(struct SLcdPins *,const u8 ,const ELcdMode);
 EXPORT_SYMBOL(hd44780_execute);
+
+extern void hd44780_write(struct SLcdPins *, const char, const ELcdMode);
+EXPORT_SYMBOL(hd44780_write);
 
 /*Extern functions*/
 u8
@@ -45,15 +48,15 @@ hd44780_init_interface(struct SLcdPins *s_lcd_pins,const ELcdMode mode)
 /*do the previous operations for data lines*/
 	if(Mode_4_bits==mode){
 		for(i=4;i<8;i++){
-			error_code+=gpio_request(s_lcd_pins->data[i].port,"sysfs");
-			error_code+=gpio_direction_output(s_lcd_pins->data[i].port,0);
-			error_code+=gpio_export(s_lcd_pins->data[i].port,0);
+			error_code+=gpio_request(s_lcd_pins->port[i],"sysfs");
+			error_code+=gpio_direction_output(s_lcd_pins->port[i],0);
+			error_code+=gpio_export(s_lcd_pins->port[i],0);
 		}
 	}else if(Mode_8_bits==mode){
 		for(i=0;i<8;i++){
-			error_code+=gpio_request(s_lcd_pins->data[i].port,"sysfs");
-			error_code+=gpio_direction_output(s_lcd_pins->data[i].port,0);
-			error_code+=gpio_export(s_lcd_pins->data[i].port,0);
+			error_code+=gpio_request(s_lcd_pins->port[i],"sysfs");
+			error_code+=gpio_direction_output(s_lcd_pins->port[i],0);
+			error_code+=gpio_export(s_lcd_pins->port[i],0);
 		}
 	}
 	/*Uuups, we have a big problem now... error_code is not checked if is 0 or not. But, don't care for now!*/
@@ -73,22 +76,44 @@ hd44780_uninit_interface(const struct SLcdPins *s_lcd_pins,const ELcdMode mode)
 	gpio_free(s_lcd_pins->en);
 	if(Mode_4_bits==mode){
 		for(i=4;i<8;i++){
-			gpio_unexport(s_lcd_pins->data[i].port);
-			gpio_free(s_lcd_pins->data[i].port);
+			gpio_unexport(s_lcd_pins->port[i]);
+			gpio_free(s_lcd_pins->port[i]);
 		}
 	}
 	else if(Mode_8_bits==mode){
 		for(i=0;i<8;i++){
-			gpio_unexport(s_lcd_pins->data[i].port);
-			gpio_free(s_lcd_pins->data[i].port);
+			gpio_unexport(s_lcd_pins->port[i]);
+			gpio_free(s_lcd_pins->port[i]);
 		}
 	}
 }
 
 void 
-hd44780_execute(struct SLcdPins *s_lcd_pins,const u8 command,const ELcdMode mode)
+hd44780_write(struct SLcdPins *s_lcd_pins, const char character, const ELcdMode mode)
 {
 
+}
+
+void 
+hd44780_execute(struct SLcdPins *s_lcd_pins,const u8 command,const ELcdMode mode)
+{
+	int i=0;
+	switch(mode){
+	case Mode_4_bits:
+		break;
+	case Mode_8_bits:{
+		/*calculate bit configuration from command and set values on IOs*/
+		for(i=0;i<8;i++){
+			gpio_set_value(s_lcd_pins->port[i],(command&(1<<i)));
+		}
+		
+	}break;
+	default:
+		break;
+	}
+	/*execute command*/
+	gpio_set_value(s_lcd_pins->e,0x1);
+	gpio_set_value(s_lcd_pins->e,0x0);
 }
 
 
