@@ -1,5 +1,5 @@
 
-FILE=HD44780_lcd_driver
+FILE=HD44780_lcd
 obj-m += $(FILE).o
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
