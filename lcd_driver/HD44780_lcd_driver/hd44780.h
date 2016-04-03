@@ -14,6 +14,50 @@ typedef enum
 	Mode_4_bits=0x00,
 	Mode_8_bits
 }ELcdMode;
+typedef enum
+{
+	INCREASE_CURSOR=0x01
+	DECREASE_CURSOR=0x00;
+}ECursorIncrease;
+
+typedef enum
+{
+	SCROLL_DISPLAY_OFF=0x00,
+	SCROLL_DISPLAY_ON=0x01
+}EScrollDisplay;
+
+typedef enum
+{
+	DISPLAY_OFF=0x00,
+	DISPLAY_ON=0x01
+}EDisplayControl;
+typedef enum
+{
+	CURSOR_OFF=0x00,
+	CURSOR_ON=0x01
+}ECursorControl;
+typedef enum
+{
+	CURSOR_BLINK_OFF=0x00,
+	CURSOR_BLINK_ON=0x01
+}ECursorBlink;
+typedef enum
+{
+	CURSOR_MOVE=0x00,
+	SHIFT_DISPLAY=0x01
+}EShiftCommand;
+typedef enum
+{
+	LEFT_SHIFT=0x00,
+	RIGHT_SHIFT=0x01
+}EShiftDirection;
+
+
+typedef enum
+{
+	DISPLAY_LINE_1=0x00,
+	DISPLAY_LINE_2=0x01
+}
 
 #define CLEAR_DISPLAY (1<<0)
 #define RETURN_HOME (1<<1)
