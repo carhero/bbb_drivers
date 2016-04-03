@@ -16,8 +16,8 @@ typedef enum
 }ELcdMode;
 typedef enum
 {
-	INCREASE_CURSOR=0x01
-	DECREASE_CURSOR=0x00;
+	INCREASE_CURSOR=0x01,
+	DECREASE_CURSOR=0x00
 }ECursorIncrease;
 
 typedef enum
@@ -57,7 +57,7 @@ typedef enum
 {
 	DISPLAY_LINE_1=0x00,
 	DISPLAY_LINE_2=0x01
-}
+}ENumberOfDisplayLines;
 
 #define CLEAR_DISPLAY (1<<0)
 #define RETURN_HOME (1<<1)

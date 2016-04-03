@@ -13,26 +13,26 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR(AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
-MODULE_SUPPORTED_DEVICE("hd44780");
+MODULE_SUPPORTED_DEVICE("hd44780")
 /*Private functions*/
 
 
 /*Exported functions*/
-extern u8 hd44780_init_interface(struct SLcdPins *,const ELcdMode);
+extern u8 hd44780_init_interface(const struct SLcdPins *,const ELcdMode);
 EXPORT_SYMBOL(hd44780_init_interface);
 
 extern void hd44780_uninit_interface(const struct SLcdPins *,const ELcdMode);
 EXPORT_SYMBOL(hd44780_uninit_interface);
 
-extern void hd44780_execute(struct SLcdPins *,const u8 ,const ELcdMode);
+extern void hd44780_execute(const struct SLcdPins *,const u8 ,const ELcdMode);
 EXPORT_SYMBOL(hd44780_execute);
 
-extern void hd44780_write(struct SLcdPins *, const char, const ELcdMode);
+extern void hd44780_write(const struct SLcdPins *, const char, const ELcdMode);
 EXPORT_SYMBOL(hd44780_write);
 
 /*Extern functions*/
 u8
-hd44780_init_interface(struct SLcdPins *s_lcd_pins,const ELcdMode mode)
+hd44780_init_interface(const struct SLcdPins *s_lcd_pins,const ELcdMode mode)
 {
 	u8 error_code=0x00;
 	u8 i;
@@ -89,31 +89,45 @@ hd44780_uninit_interface(const struct SLcdPins *s_lcd_pins,const ELcdMode mode)
 }
 
 void 
-hd44780_write(struct SLcdPins *s_lcd_pins, const char character, const ELcdMode mode)
+hd44780_write(const struct SLcdPins *s_lcd_pins, const char character, const ELcdMode mode)
 {
-
+	int i=0;
+	/*set rs=1 -> write data*/
+	gpio_set_value(s_lcd_pins->rs,0x1);
+	switch(mode){
+	case Mode_4_bits:
+		break;
+	case Mode_8_bits:
+		for(i=0;i<8;i++)
+			gpio_set_value(s_lcd_pins->port[i],((character>>i)&0x1));
+		break;
+	default:break;
+	}
+	/*execute command*/
+	gpio_set_value(s_lcd_pins->en,0x1);
+	gpio_set_value(s_lcd_pins->en,0x0);
+	/*reset rs pin state, set it to 0*/
+	gpio_set_value(s_lcd_pins->rs,0x0);
 }
 
 void 
-hd44780_execute(struct SLcdPins *s_lcd_pins,const u8 command,const ELcdMode mode)
+hd44780_execute(const struct SLcdPins *s_lcd_pins,const u8 command,const ELcdMode mode)
 {
 	int i=0;
 	switch(mode){
 	case Mode_4_bits:
 		break;
-	case Mode_8_bits:{
+	case Mode_8_bits:
 		/*calculate bit configuration from command and set values on IOs*/
-		for(i=0;i<8;i++){
+		for(i=0;i<8;i++)
 			gpio_set_value(s_lcd_pins->port[i],(command&(1<<i)));
-		}
-		
-	}break;
+		break;
 	default:
 		break;
 	}
 	/*execute command*/
-	gpio_set_value(s_lcd_pins->e,0x1);
-	gpio_set_value(s_lcd_pins->e,0x0);
+	gpio_set_value(s_lcd_pins->en,0x1);
+	gpio_set_value(s_lcd_pins->en,0x0);
 }
 
 
@@ -132,6 +146,8 @@ __exit hd44780_exit(void)
 {
 //	printk(KERN_INFO,"Driver %s unloaded. Build on %s %s\n",DEVICE_NAME,__DATE__,__TIME__);
 }
+
+
 
 
 module_init(hd44780_init);
